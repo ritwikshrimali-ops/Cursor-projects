@@ -328,8 +328,19 @@ if "last_device_info" in st.session_state:
         st.markdown(f'<p class="info-value">{st.session_state.get("advertising_id", "—")}</p>', unsafe_allow_html=True)
     
     with col2:
-        # ADID should be fetched from raw JSON adid field
-        adid_value = get_nested_value(device_info, "adid", default="—")
+        # ADID should be fetched from raw JSON Adid field (capital A)
+        # Try multiple possible field names
+        adid_value = "—"
+        if isinstance(device_info, dict):
+            adid_value = (device_info.get("Adid") or 
+                         device_info.get("adid") or 
+                         device_info.get("ADID") or 
+                         get_nested_value(device_info, "Adid") or 
+                         "—")
+            # Filter out empty/null values
+            if adid_value in [None, "", "0001-01-01T00:00:00Z"]:
+                adid_value = "—"
+        
         st.markdown(f'<p class="info-label">ADID <span class="info-icon">ℹ️</span></p>', unsafe_allow_html=True)
         st.markdown(f'<p class="info-value">{adid_value}</p>', unsafe_allow_html=True)
     
@@ -339,26 +350,31 @@ if "last_device_info" in st.session_state:
     
     with col1:
         st.markdown(f'<p class="info-label">Last app version</p>', unsafe_allow_html=True)
-        st.markdown(f'<p class="info-value">{get_nested_value(device_info, "last_app_version", default="—")}</p>', unsafe_allow_html=True)
+        last_app_version = get_nested_value(device_info, "LastAppVersion", default=get_nested_value(device_info, "last_app_version", default="—"))
+        st.markdown(f'<p class="info-value">{last_app_version}</p>', unsafe_allow_html=True)
         
         st.markdown(f'<p class="info-label">Last SDK version</p>', unsafe_allow_html=True)
-        st.markdown(f'<p class="info-value">{get_nested_value(device_info, "last_sdk_version", default="—")}</p>', unsafe_allow_html=True)
+        last_sdk_version = get_nested_value(device_info, "LastSdkVersion", default=get_nested_value(device_info, "last_sdk_version", default="—"))
+        st.markdown(f'<p class="info-value">{last_sdk_version}</p>', unsafe_allow_html=True)
         
         st.markdown(f'<p class="info-label">Last app version short</p>', unsafe_allow_html=True)
-        st.markdown(f'<p class="info-value">{get_nested_value(device_info, "last_app_version_short", default="unknown")}</p>', unsafe_allow_html=True)
+        last_app_version_short = get_nested_value(device_info, "LastAppVersionShort", default=get_nested_value(device_info, "last_app_version_short", default="unknown"))
+        st.markdown(f'<p class="info-value">{last_app_version_short}</p>', unsafe_allow_html=True)
     
     with col2:
         st.markdown(f'<p class="info-label">Last session time</p>', unsafe_allow_html=True)
-        last_session = get_nested_value(device_info, "last_session_time", default="—")
+        last_session = get_nested_value(device_info, "LastSessionTime", default=get_nested_value(device_info, "last_session_time", default="—"))
         st.markdown(f'<p class="info-value">{format_datetime(last_session) if last_session != "—" else "—"}</p>', unsafe_allow_html=True)
         
         st.markdown(f'<p class="info-label">Environment</p>', unsafe_allow_html=True)
-        environment = get_nested_value(device_info, "environment", default="production")
+        environment = get_nested_value(device_info, "Environment", default=get_nested_value(device_info, "environment", default="production"))
         st.markdown(f'<p class="info-value">{create_badge(environment, "blue")}</p>', unsafe_allow_html=True)
         
         st.markdown(f'<p class="info-label">Install state <span class="info-icon">ℹ️</span></p>', unsafe_allow_html=True)
-        install_state = get_nested_value(device_info, "install_state", default="Installed")
-        st.markdown(f'<p class="info-value">{create_badge(install_state, "green")}</p>', unsafe_allow_html=True)
+        install_state = get_nested_value(device_info, "InstallState", default=get_nested_value(device_info, "install_state", default="Installed"))
+        # Capitalize first letter for display
+        install_state_display = install_state.capitalize() if install_state != "—" else "Installed"
+        st.markdown(f'<p class="info-value">{create_badge(install_state_display, "green")}</p>', unsafe_allow_html=True)
     
     # 3. Attribution information
     st.markdown('<p class="section-header">Attribution information</p>', unsafe_allow_html=True)
@@ -366,32 +382,33 @@ if "last_device_info" in st.session_state:
     
     with col1:
         st.markdown(f'<p class="info-label">State <span class="info-icon">ℹ️</span></p>', unsafe_allow_html=True)
-        state = get_nested_value(device_info, "attribution", "state", default="Installed")
-        st.markdown(f'<p class="info-value">{create_badge(state, "green")}</p>', unsafe_allow_html=True)
+        state = get_nested_value(device_info, "State", default=get_nested_value(device_info, "attribution", "state", default="Installed"))
+        state_display = state.capitalize() if state != "—" else "Installed"
+        st.markdown(f'<p class="info-value">{create_badge(state_display, "green")}</p>', unsafe_allow_html=True)
         
         st.markdown(f'<p class="info-label">Link</p>', unsafe_allow_html=True)
-        link = get_nested_value(device_info, "attribution", "link", default="—")
+        link = get_nested_value(device_info, "Tracker", default=get_nested_value(device_info, "attribution", "link", default="—"))
         st.markdown(f'<p class="info-value">{link}</p>', unsafe_allow_html=True)
         
         st.markdown(f'<p class="info-label">Link name</p>', unsafe_allow_html=True)
-        link_name = get_nested_value(device_info, "attribution", "link_name", default="—")
+        link_name = get_nested_value(device_info, "TrackerName", default=get_nested_value(device_info, "attribution", "link_name", default="—"))
         st.markdown(f'<p class="info-value">{link_name}</p>', unsafe_allow_html=True)
     
     with col2:
         st.markdown(f'<p class="info-label">First link</p>', unsafe_allow_html=True)
-        first_link = get_nested_value(device_info, "attribution", "first_link", default="—")
+        first_link = get_nested_value(device_info, "FirstTracker", default=get_nested_value(device_info, "attribution", "first_link", default="—"))
         st.markdown(f'<p class="info-value">{first_link}</p>', unsafe_allow_html=True)
         
         st.markdown(f'<p class="info-label">First link name</p>', unsafe_allow_html=True)
-        first_link_name = get_nested_value(device_info, "attribution", "first_link_name", default="—")
+        first_link_name = get_nested_value(device_info, "FirstTrackerName", default=get_nested_value(device_info, "attribution", "first_link_name", default="—"))
         st.markdown(f'<p class="info-value">{first_link_name}</p>', unsafe_allow_html=True)
         
         st.markdown(f'<p class="info-label">Click time</p>', unsafe_allow_html=True)
-        click_time = get_nested_value(device_info, "attribution", "click_time", default="—")
+        click_time = get_nested_value(device_info, "ClickTime", default=get_nested_value(device_info, "attribution", "click_time", default="—"))
         st.markdown(f'<p class="info-value">{format_datetime(click_time) if click_time != "—" else "—"}</p>', unsafe_allow_html=True)
         
         st.markdown(f'<p class="info-label">Install time</p>', unsafe_allow_html=True)
-        install_time = get_nested_value(device_info, "attribution", "install_time", default="—")
+        install_time = get_nested_value(device_info, "InstallTime", default=get_nested_value(device_info, "attribution", "install_time", default="—"))
         st.markdown(f'<p class="info-value">{format_datetime(install_time) if install_time != "—" else "—"}</p>', unsafe_allow_html=True)
     
     # 4. Last event times - Matching the image format exactly
@@ -443,8 +460,8 @@ if "last_device_info" in st.session_state:
     # Try to extract events from various possible locations
     events_data = None
     if isinstance(device_info, dict):
-        # First, try direct keys
-        for key in ["last_event_times", "events", "device_events", "event_times", "event_data"]:
+        # First, try direct keys (including LastEventsInfo which is the actual key in Adjust API)
+        for key in ["LastEventsInfo", "last_event_times", "lastEventsInfo", "events", "device_events", "event_times", "event_data"]:
             if key in device_info:
                 events_data = device_info[key]
                 break
@@ -455,17 +472,25 @@ if "last_device_info" in st.session_state:
             if found_events:
                 events_data = found_events
         
-        # If events_data is a dict (event_name -> event_data), convert to list
+        # Handle LastEventsInfo structure: {event_token: {name: "...", time: "..."}}
         if isinstance(events_data, dict):
             events_list = []
-            for event_name, event_info in events_data.items():
+            for event_token, event_info in events_data.items():
                 if isinstance(event_info, dict):
-                    event_info["event_name"] = event_info.get("event_name", event_name)
-                    events_list.append(event_info)
-                else:
-                    # Simple case: event_name -> timestamp
+                    # Extract name and time from the event_info dict
+                    event_name = event_info.get("name") or event_info.get("event_name") or event_info.get("eventName")
+                    event_time = event_info.get("time") or event_info.get("last_event_time") or event_info.get("timestamp")
+                    
                     events_list.append({
-                        "event_name": event_name,
+                        "event_name": event_name or "—",
+                        "event_token": event_token,
+                        "last_event_time": event_time
+                    })
+                else:
+                    # Simple case: event_token -> timestamp string
+                    events_list.append({
+                        "event_name": "—",
+                        "event_token": event_token,
                         "last_event_time": event_info if isinstance(event_info, str) else None
                     })
             events_data = events_list if events_list else None
@@ -543,17 +568,17 @@ if "last_device_info" in st.session_state:
     
     with col1:
         st.markdown(f'<p class="info-label">Signature acceptance status <span class="info-icon">ℹ️</span></p>', unsafe_allow_html=True)
-        sig_status = get_nested_value(device_info, "sdk_signature", "status", default="Accepted")
+        sig_status = get_nested_value(device_info, "SignatureAcceptanceStatus", default=get_nested_value(device_info, "sdk_signature", "status", default="Accepted"))
         st.markdown(f'<p class="info-value">{create_badge(sig_status, "green")}</p>', unsafe_allow_html=True)
     
     with col2:
         st.markdown(f'<p class="info-label">Signature version <span class="info-icon">ℹ️</span></p>', unsafe_allow_html=True)
-        sig_version = get_nested_value(device_info, "sdk_signature", "version", default="—")
+        sig_version = get_nested_value(device_info, "SignatureVersion", default=get_nested_value(device_info, "sdk_signature", "version", default="—"))
         st.markdown(f'<p class="info-value">{sig_version}</p>', unsafe_allow_html=True)
     
     with col3:
         st.markdown(f'<p class="info-label">Secret ID <span class="info-icon">ℹ️</span></p>', unsafe_allow_html=True)
-        secret_id = get_nested_value(device_info, "sdk_signature", "secret_id", default="—")
+        secret_id = get_nested_value(device_info, "SecretId", default=get_nested_value(device_info, "sdk_signature", "secret_id", default="—"))
         st.markdown(f'<p class="info-value">{secret_id}</p>', unsafe_allow_html=True)
 
 # Auto-refresh status
