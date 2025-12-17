@@ -5,6 +5,13 @@ from datetime import datetime
 import time
 import pandas as pd
 
+# Hardcoded API Auth Token
+API_AUTH_TOKEN = "vREkxoDNUEyrAtkhgtRN"
+
+# API URLs
+DEVICE_INSPECT_URL = "https://api.adjust.com/device_service/api/v2/inspect_device"
+APPS_URL = "https://api.adjust.com/v1/apps"  # Common Adjust API endpoint for apps
+
 # Page configuration
 st.set_page_config(
     page_title="Testing console - Adjust",
@@ -81,36 +88,97 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Sidebar for API configuration
+# Function to fetch apps from Adjust API
+@st.cache_data(ttl=300)  # Cache for 5 minutes
+def fetch_apps(api_auth_token):
+    """Fetch list of apps from Adjust API"""
+    headers = {
+        "Authorization": f"Bearer {api_auth_token}",
+        "Accept": "application/json"
+    }
+    
+    try:
+        response = requests.get(APPS_URL, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            # Handle different possible response structures
+            if isinstance(data, dict):
+                apps = data.get("result", data.get("apps", data.get("data", [])))
+            elif isinstance(data, list):
+                apps = data
+            else:
+                apps = []
+            
+            # Extract app_token and app_name
+            app_list = []
+            for app in apps:
+                if isinstance(app, dict):
+                    app_token = app.get("app_token") or app.get("token") or app.get("id")
+                    app_name = app.get("name") or app.get("app_name") or app.get("title") or app_token
+                    if app_token:
+                        app_list.append({
+                            "app_token": app_token,
+                            "app_name": app_name
+                        })
+            
+            return app_list, None
+        else:
+            return [], f"Failed to fetch apps: {response.status_code} - {response.text}"
+    
+    except requests.exceptions.RequestException as e:
+        return [], f"Error fetching apps: {str(e)}"
+
+# Sidebar for app selection
 with st.sidebar:
-    st.header("⚙️ API Configuration")
+    st.header("⚙️ Configuration")
     
-    app_token = st.text_input(
-        "App Token",
-        value=st.session_state.get("app_token", ""),
-        help="Your Adjust app token",
-        type="default"
-    )
+    # Fetch apps
+    with st.spinner("Loading apps..."):
+        apps_list, apps_error = fetch_apps(API_AUTH_TOKEN)
     
-    api_auth_token = st.text_input(
-        "API Auth Token",
-        value=st.session_state.get("api_auth_token", ""),
-        help="Your Adjust API authentication token (Bearer token)",
-        type="password"
-    )
+    if apps_error:
+        st.error(f"Error loading apps: {apps_error}")
+        st.info("You can manually enter the app token below")
+        app_token = st.text_input(
+            "App Token",
+            value=st.session_state.get("app_token", ""),
+            help="Enter your Adjust app token manually"
+        )
+    else:
+        if apps_list:
+            # Create dropdown options
+            app_options = {f"{app['app_name']} ({app['app_token']})": app['app_token'] 
+                          for app in apps_list}
+            
+            selected_app_display = st.selectbox(
+                "Select App",
+                options=[""] + list(app_options.keys()),
+                index=0 if not st.session_state.get("selected_app") else 
+                      list(app_options.keys()).index(st.session_state.get("selected_app", "")),
+                help="Select an app from your Adjust account"
+            )
+            
+            app_token = app_options.get(selected_app_display, "") if selected_app_display else ""
+            st.session_state["selected_app"] = selected_app_display
+            
+            # Also allow manual entry
+            if st.checkbox("Enter app token manually"):
+                app_token = st.text_input(
+                    "App Token (Manual)",
+                    value=app_token,
+                    help="Enter app token manually"
+                )
+        else:
+            st.warning("No apps found. Please enter app token manually.")
+            app_token = st.text_input(
+                "App Token",
+                value=st.session_state.get("app_token", ""),
+                help="Enter your Adjust app token"
+            )
     
     # Save to session state
     st.session_state["app_token"] = app_token
-    st.session_state["api_auth_token"] = api_auth_token
-    
-    st.divider()
-    
-    # API URL
-    api_url = st.text_input(
-        "API URL",
-        value="https://api.adjust.com/device_service/api/v2/inspect_device",
-        help="Adjust API endpoint URL"
-    )
     
     st.divider()
     
@@ -155,8 +223,8 @@ with col3:
 # Function to fetch device info
 def fetch_device_info(app_token, advertising_id, api_auth_token, api_url):
     """Fetch device information from Adjust API"""
-    if not all([app_token, advertising_id, api_auth_token]):
-        return None, "Please fill in all required fields (App Token, Advertising ID, and API Auth Token)"
+    if not all([app_token, advertising_id]):
+        return None, "Please fill in App Token and Advertising ID"
     
     params = {
         "app_token": app_token,
@@ -224,8 +292,8 @@ if should_fetch:
         device_info, error = fetch_device_info(
             st.session_state.get("app_token", ""),
             st.session_state.get("advertising_id", ""),
-            st.session_state.get("api_auth_token", ""),
-            api_url
+            API_AUTH_TOKEN,
+            DEVICE_INSPECT_URL
         )
         
         if error:
@@ -256,11 +324,12 @@ if "last_device_info" in st.session_state:
     col1, col2 = st.columns(2)
     
     with col1:
-        adid_value = get_nested_value(device_info, "adid", default=st.session_state.get("advertising_id", "—"))
         st.markdown(f'<p class="info-label">Advertising ID</p>', unsafe_allow_html=True)
         st.markdown(f'<p class="info-value">{st.session_state.get("advertising_id", "—")}</p>', unsafe_allow_html=True)
     
     with col2:
+        # ADID should be fetched from raw JSON adid field
+        adid_value = get_nested_value(device_info, "adid", default="—")
         st.markdown(f'<p class="info-label">ADID <span class="info-icon">ℹ️</span></p>', unsafe_allow_html=True)
         st.markdown(f'<p class="info-value">{adid_value}</p>', unsafe_allow_html=True)
     
@@ -325,7 +394,7 @@ if "last_device_info" in st.session_state:
         install_time = get_nested_value(device_info, "attribution", "install_time", default="—")
         st.markdown(f'<p class="info-value">{format_datetime(install_time) if install_time != "—" else "—"}</p>', unsafe_allow_html=True)
     
-    # 4. Last event times
+    # 4. Last event times - Matching the image format exactly
     st.markdown('<p class="section-header">Last event times</p>', unsafe_allow_html=True)
     
     # Try to extract events from various possible locations
@@ -364,9 +433,9 @@ if "last_device_info" in st.session_state:
             events_data = events_list if events_list else None
     
     if events_data and isinstance(events_data, list) and len(events_data) > 0:
-        # Build event table with copy functionality
+        # Build event table matching the image format
         event_rows = []
-        for idx, event in enumerate(events_data):
+        for event in events_data:
             # Try multiple possible field names for event name
             event_name = (event.get("event_name") or event.get("name") or 
                          event.get("eventName") or event.get("event") or "—")
@@ -392,18 +461,28 @@ if "last_device_info" in st.session_state:
         if event_rows:
             events_df = pd.DataFrame(event_rows)
             
-            # Configure column display with copy button for event tokens
+            # Configure column display - Event tokens should be copyable
             column_config = {
-                "Event name": st.column_config.TextColumn("Event name", width="medium"),
+                "Event name": st.column_config.TextColumn(
+                    "Event name",
+                    width="medium"
+                ),
                 "Event token": st.column_config.TextColumn(
                     "Event token",
                     width="small",
-                    help="Click to copy"
+                    help="Click to copy token"
                 ),
-                "Last event time (UTC)": st.column_config.TextColumn("Last event time (UTC)", width="medium"),
-                "Last event time (local)": st.column_config.TextColumn("Last event time (local)", width="medium")
+                "Last event time (UTC)": st.column_config.TextColumn(
+                    "Last event time (UTC)",
+                    width="medium"
+                ),
+                "Last event time (local)": st.column_config.TextColumn(
+                    "Last event time (local)",
+                    width="medium"
+                )
             }
             
+            # Display table matching the image format
             st.dataframe(
                 events_df,
                 use_container_width=True,
@@ -433,19 +512,6 @@ if "last_device_info" in st.session_state:
         st.markdown(f'<p class="info-label">Secret ID <span class="info-icon">ℹ️</span></p>', unsafe_allow_html=True)
         secret_id = get_nested_value(device_info, "sdk_signature", "secret_id", default="—")
         st.markdown(f'<p class="info-value">{secret_id}</p>', unsafe_allow_html=True)
-    
-    # Raw JSON tab for debugging
-    with st.expander("🔍 View Raw JSON Response"):
-        st.json(device_info)
-        
-        # Download button
-        json_str = json.dumps(device_info, indent=2)
-        st.download_button(
-            label="📥 Download JSON",
-            data=json_str,
-            file_name=f"adjust_device_{st.session_state.get('advertising_id', 'unknown')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-            mime="application/json"
-        )
 
 # Auto-refresh status
 if auto_refresh and "last_fetch_time" in st.session_state:
