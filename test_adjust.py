@@ -397,32 +397,70 @@ if "last_device_info" in st.session_state:
     # 4. Last event times - Matching the image format exactly
     st.markdown('<p class="section-header">Last event times</p>', unsafe_allow_html=True)
     
+    # Recursive function to search for events in JSON
+    def find_events_recursive(obj, path=""):
+        """Recursively search for event data in JSON structure"""
+        events = []
+        
+        if isinstance(obj, dict):
+            # Check if this dict itself contains event-like data
+            if "event_name" in obj or "event_token" in obj or "token" in obj:
+                events.append(obj)
+            
+            # Check for common event keys
+            for key in ["last_event_times", "events", "device_events", "event_times", "event_data"]:
+                if key in obj:
+                    value = obj[key]
+                    if isinstance(value, list):
+                        events.extend(value)
+                    elif isinstance(value, dict):
+                        # If it's a dict, it might be event_name -> event_data
+                        for event_name, event_info in value.items():
+                            if isinstance(event_info, dict):
+                                event_info["event_name"] = event_info.get("event_name", event_name)
+                                events.append(event_info)
+                            else:
+                                events.append({
+                                    "event_name": event_name,
+                                    "last_event_time": event_info if isinstance(event_info, str) else None
+                                })
+            
+            # Recursively search nested dicts
+            for key, value in obj.items():
+                if isinstance(value, (dict, list)):
+                    events.extend(find_events_recursive(value, f"{path}.{key}"))
+        
+        elif isinstance(obj, list):
+            # Check if list contains event objects
+            for item in obj:
+                if isinstance(item, dict) and ("event_name" in item or "event_token" in item or "token" in item):
+                    events.append(item)
+                elif isinstance(item, (dict, list)):
+                    events.extend(find_events_recursive(item, path))
+        
+        return events
+    
     # Try to extract events from various possible locations
     events_data = None
     if isinstance(device_info, dict):
-        # Try common event keys
-        for key in ["last_event_times", "events", "device_events", "event_times"]:
+        # First, try direct keys
+        for key in ["last_event_times", "events", "device_events", "event_times", "event_data"]:
             if key in device_info:
                 events_data = device_info[key]
                 break
         
-        # Try nested in attribution or other objects
+        # If not found, do recursive search
         if events_data is None:
-            for key, value in device_info.items():
-                if isinstance(value, dict):
-                    for sub_key in ["last_event_times", "events", "device_events"]:
-                        if sub_key in value:
-                            events_data = value[sub_key]
-                            break
-                    if events_data:
-                        break
+            found_events = find_events_recursive(device_info)
+            if found_events:
+                events_data = found_events
         
         # If events_data is a dict (event_name -> event_data), convert to list
         if isinstance(events_data, dict):
             events_list = []
             for event_name, event_info in events_data.items():
                 if isinstance(event_info, dict):
-                    event_info["event_name"] = event_name
+                    event_info["event_name"] = event_info.get("event_name", event_name)
                     events_list.append(event_info)
                 else:
                     # Simple case: event_name -> timestamp
@@ -493,6 +531,11 @@ if "last_device_info" in st.session_state:
             st.info("No event data available")
     else:
         st.info("No event data available")
+        
+        # Debug: Show JSON structure to help identify where events are
+        with st.expander("🔍 Debug: View JSON structure to find events", expanded=False):
+            st.json(device_info)
+            st.caption("💡 Look for keys like 'last_event_times', 'events', 'device_events', or any array/list containing event data")
     
     # 5. SDK Signature information
     st.markdown('<p class="section-header">SDK Signature information</p>', unsafe_allow_html=True)
