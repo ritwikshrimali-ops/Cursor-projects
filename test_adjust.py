@@ -220,9 +220,9 @@ with col2:
 with col3:
     forget_button = st.button("Forget device", use_container_width=True)
 
-# Function to fetch device info
-def fetch_device_info(app_token, advertising_id, api_auth_token, api_url):
-    """Fetch device information from Adjust API"""
+# Function to fetch device info with retry logic
+def fetch_device_info(app_token, advertising_id, api_auth_token, api_url, max_retries=3):
+    """Fetch device information from Adjust API with retry logic"""
     if not all([app_token, advertising_id]):
         return None, "Please fill in App Token and Advertising ID"
     
@@ -236,18 +236,57 @@ def fetch_device_info(app_token, advertising_id, api_auth_token, api_url):
         "Accept": "application/json"
     }
     
-    try:
-        response = requests.get(api_url, params=params, headers=headers, timeout=10)
-        
-        if response.status_code == 200:
-            return response.json(), None
-        else:
-            return None, f"API Error {response.status_code}: {response.text}"
+    # Try with increasing timeout values
+    timeout_values = [15, 30, 45]
     
-    except requests.exceptions.Timeout:
-        return None, "Request timed out. Please try again."
-    except requests.exceptions.RequestException as e:
-        return None, f"Request failed: {str(e)}"
+    for attempt in range(max_retries):
+        try:
+            timeout = timeout_values[min(attempt, len(timeout_values) - 1)]
+            response = requests.get(api_url, params=params, headers=headers, timeout=timeout)
+            
+            if response.status_code == 200:
+                return response.json(), None
+            elif response.status_code == 502:
+                # 502 Bad Gateway - might be temporary, retry
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)  # Exponential backoff: 1s, 2s, 4s
+                    continue
+                else:
+                    error_data = response.text
+                    try:
+                        error_json = response.json()
+                        if "errors" in error_json:
+                            error_msg = ", ".join(error_json["errors"])
+                            return None, f"API Error {response.status_code}: {error_msg}. The API request timed out. Please try again in a moment."
+                    except:
+                        pass
+                    return None, f"API Error {response.status_code}: {error_data}. The API request timed out. Please try again."
+            else:
+                error_data = response.text
+                try:
+                    error_json = response.json()
+                    if "errors" in error_json:
+                        error_msg = ", ".join(error_json["errors"])
+                        return None, f"API Error {response.status_code}: {error_msg}"
+                except:
+                    pass
+                return None, f"API Error {response.status_code}: {error_data}"
+        
+        except requests.exceptions.Timeout:
+            if attempt < max_retries - 1:
+                time.sleep(2 ** attempt)  # Exponential backoff
+                continue
+            else:
+                return None, f"Request timed out after {max_retries} attempts. The API may be slow or overloaded. Please try again in a moment."
+        
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries - 1:
+                time.sleep(2 ** attempt)
+                continue
+            else:
+                return None, f"Request failed after {max_retries} attempts: {str(e)}"
+    
+    return None, "Failed to fetch device information after multiple attempts."
 
 # Function to create badge
 def create_badge(text, badge_type="green"):
