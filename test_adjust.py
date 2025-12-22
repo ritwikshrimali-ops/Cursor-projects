@@ -133,9 +133,14 @@ def fetch_apps(api_auth_token):
 with st.sidebar:
     st.header("⚙️ Configuration")
     
-    # Fetch apps
-    with st.spinner("Loading apps..."):
-        apps_list, apps_error = fetch_apps(API_AUTH_TOKEN)
+    # Fetch apps (with error handling to prevent app crash)
+    try:
+        with st.spinner("Loading apps..."):
+            apps_list, apps_error = fetch_apps(API_AUTH_TOKEN)
+    except Exception as e:
+        apps_list = []
+        apps_error = f"Error loading apps: {str(e)}"
+        st.error(f"Failed to load apps: {str(e)}")
     
     if apps_error:
         st.error(f"Error loading apps: {apps_error}")
@@ -151,11 +156,23 @@ with st.sidebar:
             app_options = {f"{app['app_name']} ({app['app_token']})": app['app_token'] 
                           for app in apps_list}
             
+            # Get current selection safely
+            current_selection = st.session_state.get("selected_app", "")
+            app_keys = list(app_options.keys())
+            
+            # Find index safely
+            try:
+                if current_selection and current_selection in app_keys:
+                    selected_index = app_keys.index(current_selection) + 1  # +1 because "" is first option
+                else:
+                    selected_index = 0
+            except (ValueError, IndexError):
+                selected_index = 0
+            
             selected_app_display = st.selectbox(
                 "Select App",
-                options=[""] + list(app_options.keys()),
-                index=0 if not st.session_state.get("selected_app") else 
-                      list(app_options.keys()).index(st.session_state.get("selected_app", "")),
+                options=[""] + app_keys,
+                index=selected_index,
                 help="Select an app from your Adjust account"
             )
             
