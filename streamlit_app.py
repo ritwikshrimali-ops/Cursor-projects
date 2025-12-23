@@ -276,12 +276,17 @@ if "share_email" not in st.session_state:
 # Share button styling - ensure text stays on one line
 st.markdown("""
     <style>
-    button[data-testid*="share"] {
+    /* Fix Share button text to stay on one line */
+    button[data-testid*="share_button_top"] {
         white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
+        word-break: keep-all !important;
     }
-    .share-popover-wrapper {
+    button[data-testid*="share_button_top"] p {
+        white-space: nowrap !important;
+        margin: 0 !important;
+    }
+    /* Share popover styling */
+    #sharePopover {
         position: fixed;
         top: 3.5rem;
         right: 1rem;
@@ -300,63 +305,73 @@ st.markdown("""
 # Create columns to position Share button in top right
 col_left, col_right = st.columns([0.95, 0.05])
 with col_right:
-    if st.button("Share", key="share_button_top", help="Share access with other users", use_container_width=True):
+    if st.button("Share", key="share_button_top", help="Share access with other users", use_container_width=False):
         st.session_state["share_modal_open"] = not st.session_state["share_modal_open"]
         st.rerun()
 
-# Compact share popover - only show when modal is open
+# Handle closing share modal
+if st.query_params.get("close_share") == "true":
+    st.session_state["share_modal_open"] = False
+    st.rerun()
+
+# Handle share email submission
+if st.query_params.get("share_email"):
+    email = st.query_params.get("share_email")
+    if email and "@" in email and "." in email.split("@")[1]:
+        st.success(f"✅ Access shared with {email}")
+        st.session_state["share_modal_open"] = False
+        st.rerun()
+
+# Compact share popover - only show when modal is open (using pure HTML/JS overlay)
 if st.session_state["share_modal_open"]:
-    # Use a container with fixed positioning
-    with st.container():
-        st.markdown("""
-            <div class="share-popover-wrapper">
-        """, unsafe_allow_html=True)
+    st.markdown("""
+        <div id="sharePopover">
+            <form id="shareForm" onsubmit="event.preventDefault(); handleShareSubmit();">
+                <label for="shareEmailInput" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #333;">Email address</label>
+                <input type="email" id="shareEmailInput" placeholder="user@example.com" 
+                       style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 0.25rem; margin-bottom: 0.75rem; font-size: 0.9rem; box-sizing: border-box;" />
+                <div style="display: flex; gap: 0.5rem;">
+                    <button type="submit" id="shareSubmitBtn" 
+                            style="flex: 1; padding: 0.5rem; background-color: #ff4444; color: white; border: none; border-radius: 0.25rem; cursor: pointer; font-size: 0.9rem; font-weight: 500;">Share</button>
+                    <button type="button" 
+                            style="flex: 1; padding: 0.5rem; background-color: white; color: #333; border: 1px solid #ddd; border-radius: 0.25rem; cursor: pointer; font-size: 0.9rem; font-weight: 500;"
+                            onclick="closeSharePopover()">Cancel</button>
+                </div>
+            </form>
+        </div>
+        <script>
+        function handleShareSubmit() {
+            const email = document.getElementById('shareEmailInput').value.trim();
+            if (email && email.includes('@') && email.includes('.')) {
+                // Navigate with email as query param
+                const url = new URL(window.location.href);
+                url.searchParams.set('share_email', email);
+                window.location.href = url.toString();
+            } else {
+                alert('Please enter a valid email address.');
+            }
+        }
         
-        with st.form("share_form", clear_on_submit=True):
-            share_email = st.text_input(
-                "Email address",
-                value="",
-                placeholder="user@example.com",
-                key="share_email_input",
-                label_visibility="visible"
-            )
-            
-            col1, col2 = st.columns([1, 1])
-            with col1:
-                share_submitted = st.form_submit_button("Share", type="primary", use_container_width=True)
-            with col2:
-                cancel_clicked = st.form_submit_button("Cancel", use_container_width=True)
-            
-            if share_submitted:
-                if share_email and "@" in share_email and "." in share_email.split("@")[1]:
-                    # In production, you would send email here
-                    st.success(f"✅ Access shared with {share_email}")
-                    st.session_state["share_modal_open"] = False
-                    st.rerun()
-                else:
-                    st.warning("Please enter a valid email address.")
-            
-            if cancel_clicked:
-                st.session_state["share_modal_open"] = False
-                st.rerun()
+        function closeSharePopover() {
+            // Navigate without share modal state
+            const url = new URL(window.location.href);
+            url.searchParams.set('close_share', 'true');
+            window.location.href = url.toString();
+        }
         
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        # Close on outside click using JavaScript
-        st.markdown("""
-            <script>
-            setTimeout(function() {
-                document.addEventListener('click', function closeOnOutsideClick(event) {
-                    const popover = document.querySelector('.share-popover-wrapper');
-                    const shareButton = event.target.closest('button[data-testid*="share"]');
-                    if (popover && !popover.contains(event.target) && !shareButton) {
-                        // Close the modal by reloading without the modal state
-                        window.location.href = window.location.pathname;
-                    }
-                });
-            }, 100);
-            </script>
-        """, unsafe_allow_html=True)
+        // Close on outside click
+        setTimeout(function() {
+            document.addEventListener('click', function(event) {
+                const popover = document.getElementById('sharePopover');
+                const shareButton = event.target.closest('button[data-testid*="share_button_top"]');
+                const shareForm = document.getElementById('shareForm');
+                if (popover && !popover.contains(event.target) && !shareButton && event.target !== shareForm) {
+                    closeSharePopover();
+                }
+            });
+        }, 100);
+        </script>
+    """, unsafe_allow_html=True)
 
 # Main content - Header section
 st.markdown('<p class="main-header">Testing console</p>', unsafe_allow_html=True)
