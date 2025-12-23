@@ -10,7 +10,6 @@ API_AUTH_TOKEN = "vREkxoDNUEyrAtkhgtRN"
 
 # API URLs
 DEVICE_INSPECT_URL = "https://api.adjust.com/device_service/api/v2/inspect_device"
-APPS_URL = "https://api.adjust.com/v1/apps"  # Common Adjust API endpoint for apps
 
 # Page configuration
 st.set_page_config(
@@ -96,114 +95,62 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Function to fetch apps from Adjust API
-@st.cache_data(ttl=300)  # Cache for 5 minutes
-def fetch_apps(api_auth_token):
-    """Fetch list of apps from Adjust API"""
-    headers = {
-        "Authorization": f"Bearer {api_auth_token}",
-        "Accept": "application/json"
-    }
-    
-    try:
-        response = requests.get(APPS_URL, headers=headers, timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            # Handle different possible response structures
-            if isinstance(data, dict):
-                apps = data.get("result", data.get("apps", data.get("data", [])))
-            elif isinstance(data, list):
-                apps = data
-            else:
-                apps = []
-            
-            # Extract app_token and app_name
-            app_list = []
-            for app in apps:
-                if isinstance(app, dict):
-                    app_token = app.get("app_token") or app.get("token") or app.get("id")
-                    app_name = app.get("name") or app.get("app_name") or app.get("title") or app_token
-                    if app_token:
-                        app_list.append({
-                            "app_token": app_token,
-                            "app_name": app_name
-                        })
-            
-            return app_list, None
-        else:
-            return [], f"Failed to fetch apps: {response.status_code} - {response.text}"
-    
-    except requests.exceptions.RequestException as e:
-        return [], f"Error fetching apps: {str(e)}"
+# App name to token mapping
+APP_NAME_TO_TOKEN = {
+    "Word Search": "df8zj1g2e4n4",
+    "Word Trip": "brmx7fdxeakg",
+    "Daily themed crossword": "5m1ixiozuxs0",
+    "Tilescapes": "d9j2i31ih5hc",
+    "Crossword Go": "lh3djeuvx8u8",
+    "Word Bingo": "axyjxakbq4u8",
+    "Cryptogram": "mmdpjw08385c",
+    "Word Tour": "10m9pfaqr7og",
+    "Word Connect Association": "r35fo7shcq20",
+    "Crossword Explorer": "kl9obuzolf5s",
+    "Wordsearch Explorer Amazon": "imv73i9w1kw0",
+    "DTC Amazon": "m5wkkketzbwg",
+    "Word Jam": "yi754iuv045c",
+    "Word Search Solitaire": "f31mdtfxsj5s",
+    "Word Jam Amazon": "lq4zr6bosmbk",
+    "Word Trip Amazon": "o7zbc1ugkcg0",
+    "Wordsearch-wordtrip": "peaqr4bgdb7k",
+    "2248 Tiles Game": "wh6mlumfs2rk",
+    "WordPal": "ftrpnn2xascg",
+    "Word Planet": "0695581rbqww"
+}
 
 # Sidebar for app selection
 with st.sidebar:
     st.header("⚙️ Configuration")
     
-    # Fetch apps (with error handling to prevent app crash)
+    # App selection dropdown
+    app_names = list(APP_NAME_TO_TOKEN.keys())
+    current_selection = st.session_state.get("selected_app_name", "")
+    
+    # Find index safely
     try:
-        with st.spinner("Loading apps..."):
-            apps_list, apps_error = fetch_apps(API_AUTH_TOKEN)
-    except Exception as e:
-        apps_list = []
-        apps_error = f"Error loading apps: {str(e)}"
-        st.error(f"Failed to load apps: {str(e)}")
-    
-    if apps_error:
-        st.error(f"Error loading apps: {apps_error}")
-        st.info("You can manually enter the app token below")
-        app_token = st.text_input(
-            "App Token",
-            value=st.session_state.get("app_token", ""),
-            help="Enter your Adjust app token manually"
-        )
-    else:
-        if apps_list:
-            # Create dropdown options
-            app_options = {f"{app['app_name']} ({app['app_token']})": app['app_token'] 
-                          for app in apps_list}
-            
-            # Get current selection safely
-            current_selection = st.session_state.get("selected_app", "")
-            app_keys = list(app_options.keys())
-            
-            # Find index safely
-            try:
-                if current_selection and current_selection in app_keys:
-                    selected_index = app_keys.index(current_selection) + 1  # +1 because "" is first option
-                else:
-                    selected_index = 0
-            except (ValueError, IndexError):
-                selected_index = 0
-            
-            selected_app_display = st.selectbox(
-                "Select App",
-                options=[""] + app_keys,
-                index=selected_index,
-                help="Select an app from your Adjust account"
-            )
-            
-            app_token = app_options.get(selected_app_display, "") if selected_app_display else ""
-            st.session_state["selected_app"] = selected_app_display
-            
-            # Also allow manual entry
-            if st.checkbox("Enter app token manually"):
-                app_token = st.text_input(
-                    "App Token (Manual)",
-                    value=app_token,
-                    help="Enter app token manually"
-                )
+        if current_selection and current_selection in app_names:
+            selected_index = app_names.index(current_selection)
         else:
-            st.warning("No apps found. Please enter app token manually.")
-            app_token = st.text_input(
-                "App Token",
-                value=st.session_state.get("app_token", ""),
-                help="Enter your Adjust app token"
-            )
+            selected_index = 0
+    except (ValueError, IndexError):
+        selected_index = 0
     
-    # Save to session state
+    selected_app_name = st.selectbox(
+        "Select App",
+        options=app_names,
+        index=selected_index,
+        help="Select an app to test"
+    )
+    
+    # Automatically set app token based on selected app name
+    app_token = APP_NAME_TO_TOKEN.get(selected_app_name, "")
+    st.session_state["selected_app_name"] = selected_app_name
     st.session_state["app_token"] = app_token
+    
+    # Show selected app token (read-only)
+    if app_token:
+        st.caption(f"App Token: `{app_token}`")
 
 # Main content - Header section
 st.markdown('<p class="main-header">Testing console</p>', unsafe_allow_html=True)
