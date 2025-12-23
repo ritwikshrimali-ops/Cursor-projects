@@ -31,6 +31,29 @@ st.markdown("""
     footer {visibility: hidden;}
     header {visibility: hidden;}
     .stDeployButton {display:none;}
+    
+    /* Share button styling */
+    .share-button-container {
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        z-index: 999;
+    }
+    .share-button {
+        background-color: #1f77b4;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 500;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: background-color 0.3s;
+    }
+    .share-button:hover {
+        background-color: #1565a0;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -151,6 +174,50 @@ with st.sidebar:
     # Show selected app token (read-only)
     if app_token:
         st.caption(f"App Token: `{app_token}`")
+
+# Share button in top right corner
+st.markdown("""
+    <div class="share-button-container">
+        <button class="share-button" onclick="shareApp()">Share</button>
+    </div>
+    <script>
+    function shareApp() {
+        const url = window.location.href;
+        if (navigator.share) {
+            navigator.share({
+                title: 'Adjust Testing Console',
+                text: 'Check out this Adjust Testing Console',
+                url: url
+            }).catch(err => {
+                console.log('Error sharing:', err);
+                copyToClipboard(url);
+            });
+        } else {
+            copyToClipboard(url);
+        }
+    }
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(function() {
+            alert('Link copied to clipboard! Share this link with others.');
+        }, function(err) {
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.opacity = '0';
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                alert('Link copied to clipboard! Share this link with others.');
+            } catch (err) {
+                prompt('Copy this link:', text);
+            }
+            document.body.removeChild(textArea);
+        });
+    }
+    </script>
+""", unsafe_allow_html=True)
 
 # Main content - Header section
 st.markdown('<p class="main-header">Testing console</p>', unsafe_allow_html=True)
