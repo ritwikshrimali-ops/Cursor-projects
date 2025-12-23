@@ -20,6 +20,21 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Force light theme
+st.markdown("""
+    <style>
+    /* Force light theme */
+    .stApp {
+        background-color: #ffffff;
+    }
+    /* Hide GitHub menu and other Streamlit menu items */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .stDeployButton {display:none;}
+    </style>
+""", unsafe_allow_html=True)
+
 # Custom CSS to match Adjust console styling
 st.markdown("""
     <style>
@@ -77,13 +92,6 @@ st.markdown("""
         border: 1px solid #f5c6cb;
         color: #721c24;
         margin: 1rem 0;
-    }
-    .info-icon {
-        display: inline-block;
-        width: 14px;
-        height: 14px;
-        margin-left: 4px;
-        cursor: help;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -196,20 +204,6 @@ with st.sidebar:
     
     # Save to session state
     st.session_state["app_token"] = app_token
-    
-    st.divider()
-    
-    # Auto-refresh settings
-    st.subheader("🔄 Auto-refresh")
-    auto_refresh = st.checkbox("Enable Auto-refresh", value=False)
-    refresh_interval = st.slider(
-        "Interval (seconds)",
-        min_value=5,
-        max_value=60,
-        value=10,
-        step=5,
-        disabled=not auto_refresh
-    )
 
 # Main content - Header section
 st.markdown('<p class="main-header">Testing console</p>', unsafe_allow_html=True)
@@ -325,13 +319,8 @@ def format_datetime(dt_str, format_type="utc"):
     except:
         return dt_str
 
-# Auto-fetch logic
+# Auto-fetch logic (removed - no auto-refresh)
 auto_fetch_triggered = False
-if auto_refresh:
-    last_fetch = st.session_state.get("last_fetch_time", 0)
-    current_time = time.time()
-    if current_time - last_fetch >= refresh_interval:
-        auto_fetch_triggered = True
 
 # Handle forget device button
 if forget_button:
@@ -340,8 +329,8 @@ if forget_button:
     st.session_state["advertising_id"] = ""
     st.rerun()
 
-# Fetch data when button is clicked or auto-refresh triggers
-should_fetch = fetch_button or auto_fetch_triggered
+# Fetch data when button is clicked
+should_fetch = fetch_button
 
 if should_fetch:
     with st.spinner("Fetching device information..."):
@@ -397,7 +386,7 @@ if "last_device_info" in st.session_state:
             if adid_value in [None, "", "0001-01-01T00:00:00Z"]:
                 adid_value = "—"
         
-        st.markdown(f'<p class="info-label">ADID <span class="info-icon">ℹ️</span></p>', unsafe_allow_html=True)
+        st.markdown(f'<p class="info-label">ADID</p>', unsafe_allow_html=True)
         st.markdown(f'<p class="info-value">{adid_value}</p>', unsafe_allow_html=True)
     
     # 2. App information
@@ -426,7 +415,7 @@ if "last_device_info" in st.session_state:
         environment = get_nested_value(device_info, "Environment", default=get_nested_value(device_info, "environment", default="production"))
         st.markdown(f'<p class="info-value">{create_badge(environment, "blue")}</p>', unsafe_allow_html=True)
         
-        st.markdown(f'<p class="info-label">Install state <span class="info-icon">ℹ️</span></p>', unsafe_allow_html=True)
+        st.markdown(f'<p class="info-label">Install state</p>', unsafe_allow_html=True)
         install_state = get_nested_value(device_info, "InstallState", default=get_nested_value(device_info, "install_state", default="Installed"))
         # Capitalize first letter for display
         install_state_display = install_state.capitalize() if install_state != "—" else "Installed"
@@ -437,7 +426,7 @@ if "last_device_info" in st.session_state:
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown(f'<p class="info-label">State <span class="info-icon">ℹ️</span></p>', unsafe_allow_html=True)
+        st.markdown(f'<p class="info-label">State</p>', unsafe_allow_html=True)
         state = get_nested_value(device_info, "State", default=get_nested_value(device_info, "attribution", "state", default="Installed"))
         state_display = state.capitalize() if state != "—" else "Installed"
         st.markdown(f'<p class="info-value">{create_badge(state_display, "green")}</p>', unsafe_allow_html=True)
@@ -620,30 +609,33 @@ if "last_device_info" in st.session_state:
     
     # 5. SDK Signature information
     st.markdown('<p class="section-header">SDK Signature information</p>', unsafe_allow_html=True)
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.markdown(f'<p class="info-label">Signature acceptance status <span class="info-icon">ℹ️</span></p>', unsafe_allow_html=True)
+        st.markdown(f'<p class="info-label">Signature verification result</p>', unsafe_allow_html=True)
+        sig_verification = get_nested_value(device_info, "SignatureVerificationResult", default=get_nested_value(device_info, "signature_verification_result", default=get_nested_value(device_info, "sdk_signature", "verification_result", default="—")))
+        # Format the verification result
+        if sig_verification != "—":
+            sig_verification_display = sig_verification.replace("_", " ").title() if isinstance(sig_verification, str) else str(sig_verification)
+            # Check if it's a valid signature
+            if "valid" in sig_verification_display.lower():
+                st.markdown(f'<p class="info-value">{create_badge(sig_verification_display, "green")}</p>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<p class="info-value">{sig_verification_display}</p>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<p class="info-value">{sig_verification}</p>', unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f'<p class="info-label">Signature acceptance status</p>', unsafe_allow_html=True)
         sig_status = get_nested_value(device_info, "SignatureAcceptanceStatus", default=get_nested_value(device_info, "sdk_signature", "status", default="Accepted"))
         st.markdown(f'<p class="info-value">{create_badge(sig_status, "green")}</p>', unsafe_allow_html=True)
     
-    with col2:
-        st.markdown(f'<p class="info-label">Signature version <span class="info-icon">ℹ️</span></p>', unsafe_allow_html=True)
+    with col3:
+        st.markdown(f'<p class="info-label">Signature version</p>', unsafe_allow_html=True)
         sig_version = get_nested_value(device_info, "SignatureVersion", default=get_nested_value(device_info, "sdk_signature", "version", default="—"))
         st.markdown(f'<p class="info-value">{sig_version}</p>', unsafe_allow_html=True)
     
-    with col3:
-        st.markdown(f'<p class="info-label">Secret ID <span class="info-icon">ℹ️</span></p>', unsafe_allow_html=True)
+    with col4:
+        st.markdown(f'<p class="info-label">Secret ID</p>', unsafe_allow_html=True)
         secret_id = get_nested_value(device_info, "SecretId", default=get_nested_value(device_info, "sdk_signature", "secret_id", default="—"))
         st.markdown(f'<p class="info-value">{secret_id}</p>', unsafe_allow_html=True)
-
-# Auto-refresh status
-if auto_refresh and "last_fetch_time" in st.session_state:
-    current_time = time.time()
-    elapsed = current_time - st.session_state.get("last_fetch_time", current_time)
-    remaining = max(0, refresh_interval - elapsed)
-    
-    if remaining > 0:
-        progress = 1 - (remaining / refresh_interval)
-        st.progress(progress)
-        st.caption(f"🔄 Auto-refresh enabled | Next refresh in {int(remaining)} seconds")
