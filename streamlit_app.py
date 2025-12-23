@@ -270,92 +270,93 @@ with st.sidebar:
 # Initialize session state for share functionality
 if "share_modal_open" not in st.session_state:
     st.session_state["share_modal_open"] = False
-if "shared_emails" not in st.session_state:
-    st.session_state["shared_emails"] = []
-if "new_email" not in st.session_state:
-    st.session_state["new_email"] = ""
+if "share_email" not in st.session_state:
+    st.session_state["share_email"] = ""
 
-# Share button in top right corner
+# Share button styling - ensure text stays on one line
 st.markdown("""
     <style>
-    .share-button-wrapper {
+    button[data-testid*="share"] {
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+    .share-popover-wrapper {
         position: fixed;
-        top: 1rem;
+        top: 3.5rem;
         right: 1rem;
-        z-index: 999;
+        z-index: 1000;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        min-width: 280px;
+        max-width: 320px;
     }
     </style>
-    <div class="share-button-wrapper">
-    </div>
 """, unsafe_allow_html=True)
 
 # Create columns to position Share button in top right
 col_left, col_right = st.columns([0.95, 0.05])
 with col_right:
-    if st.button("Share", key="share_button_top", help="Share access with other users"):
+    if st.button("Share", key="share_button_top", help="Share access with other users", use_container_width=True):
         st.session_state["share_modal_open"] = not st.session_state["share_modal_open"]
         st.rerun()
 
-# Share modal using Streamlit components
+# Compact share popover - only show when modal is open
 if st.session_state["share_modal_open"]:
-    st.markdown("---")
+    # Use a container with fixed positioning
     with st.container():
-        st.markdown("### 📧 Share Access")
-        st.markdown("Enter email addresses of users you want to share access with:")
+        st.markdown("""
+            <div class="share-popover-wrapper">
+        """, unsafe_allow_html=True)
         
-        # Display current emails
-        if st.session_state["shared_emails"]:
-            st.markdown("**Added emails:**")
-            for idx, email in enumerate(st.session_state["shared_emails"]):
-                col1, col2 = st.columns([0.9, 0.1])
-                with col1:
-                    st.markdown(f"📧 {email}")
-                with col2:
-                    if st.button("×", key=f"remove_{idx}"):
-                        st.session_state["shared_emails"].remove(email)
-                        st.rerun()
-        
-        # Add new email
-        new_email = st.text_input(
-            "Email address",
-            value=st.session_state["new_email"],
-            key="email_input",
-            placeholder="user@example.com",
-            label_visibility="visible"
-        )
-        
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col1:
-            if st.button("➕ Add Email", type="primary", use_container_width=True):
-                if new_email and "@" in new_email and "." in new_email.split("@")[1]:
-                    if new_email not in st.session_state["shared_emails"]:
-                        st.session_state["shared_emails"].append(new_email)
-                        st.session_state["new_email"] = ""
-                        st.rerun()
-                    else:
-                        st.warning("This email is already added.")
-                else:
-                    st.warning("Please enter a valid email address.")
-        
-        with col2:
-            if st.button("📤 Send Invites", type="primary", use_container_width=True):
-                if st.session_state["shared_emails"]:
-                    # In production, you would send emails here
-                    # For now, show success message
-                    st.success(f"✅ Invites sent successfully to: {', '.join(st.session_state['shared_emails'])}")
-                    st.session_state["shared_emails"] = []
+        with st.form("share_form", clear_on_submit=True):
+            share_email = st.text_input(
+                "Email address",
+                value="",
+                placeholder="user@example.com",
+                key="share_email_input",
+                label_visibility="visible"
+            )
+            
+            col1, col2 = st.columns([1, 1])
+            with col1:
+                share_submitted = st.form_submit_button("Share", type="primary", use_container_width=True)
+            with col2:
+                cancel_clicked = st.form_submit_button("Cancel", use_container_width=True)
+            
+            if share_submitted:
+                if share_email and "@" in share_email and "." in share_email.split("@")[1]:
+                    # In production, you would send email here
+                    st.success(f"✅ Access shared with {share_email}")
                     st.session_state["share_modal_open"] = False
-                    st.session_state["new_email"] = ""
                     st.rerun()
                 else:
-                    st.warning("Please add at least one email address.")
-        
-        with col3:
-            if st.button("❌ Cancel", use_container_width=True):
+                    st.warning("Please enter a valid email address.")
+            
+            if cancel_clicked:
                 st.session_state["share_modal_open"] = False
-                st.session_state["new_email"] = ""
                 st.rerun()
-    st.markdown("---")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Close on outside click using JavaScript
+        st.markdown("""
+            <script>
+            setTimeout(function() {
+                document.addEventListener('click', function closeOnOutsideClick(event) {
+                    const popover = document.querySelector('.share-popover-wrapper');
+                    const shareButton = event.target.closest('button[data-testid*="share"]');
+                    if (popover && !popover.contains(event.target) && !shareButton) {
+                        // Close the modal by reloading without the modal state
+                        window.location.href = window.location.pathname;
+                    }
+                });
+            }, 100);
+            </script>
+        """, unsafe_allow_html=True)
 
 # Main content - Header section
 st.markdown('<p class="main-header">Testing console</p>', unsafe_allow_html=True)
