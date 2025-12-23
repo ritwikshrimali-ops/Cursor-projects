@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 import json
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import time
 import pandas as pd
 
@@ -19,18 +19,59 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Force light theme
+# Force light theme - override all Streamlit theme settings
 st.markdown("""
     <style>
-    /* Force light theme */
+    /* Force light theme for all users */
     .stApp {
-        background-color: #ffffff;
+        background-color: #ffffff !important;
+        color: #1a1a1a !important;
     }
+    
+    /* Override dark theme variables */
+    :root {
+        --background-color: #ffffff !important;
+        --secondary-background-color: #f0f2f6 !important;
+        --text-color: #1a1a1a !important;
+        --font: "Source Sans Pro", sans-serif !important;
+    }
+    
+    /* Force light theme on all Streamlit components */
+    .main .block-container {
+        background-color: #ffffff !important;
+        color: #1a1a1a !important;
+    }
+    
+    .stSidebar {
+        background-color: #f0f2f6 !important;
+        color: #1a1a1a !important;
+    }
+    
+    /* Force light theme on input fields */
+    .stTextInput > div > div > input {
+        background-color: #ffffff !important;
+        color: #1a1a1a !important;
+    }
+    
+    .stSelectbox > div > div > select {
+        background-color: #ffffff !important;
+        color: #1a1a1a !important;
+    }
+    
+    /* Force light theme on buttons */
+    .stButton > button {
+        background-color: #ff4444 !important;
+        color: #ffffff !important;
+    }
+    
     /* Hide GitHub menu and other Streamlit menu items */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     .stDeployButton {display:none;}
+    
+    /* Hide theme selector if present */
+    [data-testid="stDecoration"] {display: none;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -254,16 +295,24 @@ def create_badge(text, badge_type="green"):
 
 # Function to format datetime
 def format_datetime(dt_str, format_type="utc"):
-    """Format datetime string"""
+    """Format datetime string. For local format, converts UTC to IST (UTC+5:30)"""
     if not dt_str or dt_str == "0001-01-01T00:00:00Z":
         return "—"
     try:
-        dt = datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
+        # Parse UTC datetime
+        dt_utc = datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
+        
         if format_type == "utc":
-            return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-        else:  # local
-            return dt.strftime("%Y-%m-%d %H:%M:%S")
-    except:
+            return dt_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+        else:  # local - convert UTC to IST (UTC+5:30)
+            # Create IST timezone (UTC+5:30)
+            ist_offset = timedelta(hours=5, minutes=30)
+            ist_timezone = timezone(ist_offset)
+            
+            # Convert UTC to IST
+            dt_ist = dt_utc.replace(tzinfo=timezone.utc).astimezone(ist_timezone)
+            return dt_ist.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception as e:
         return dt_str
 
 # Auto-fetch logic (removed - no auto-refresh)
