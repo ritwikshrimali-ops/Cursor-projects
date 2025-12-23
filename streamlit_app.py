@@ -54,6 +54,98 @@ st.markdown("""
     .share-button:hover {
         background-color: #1565a0;
     }
+    
+    /* Modal styling */
+    .share-modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0,0,0,0.4);
+    }
+    .share-modal-content {
+        background-color: #fefefe;
+        margin: 10% auto;
+        padding: 2rem;
+        border: 1px solid #888;
+        border-radius: 0.5rem;
+        width: 90%;
+        max-width: 500px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .share-modal-header {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: #1a1a1a;
+    }
+    .share-modal-close {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    .share-modal-close:hover,
+    .share-modal-close:focus {
+        color: #000;
+    }
+    .email-input-container {
+        margin-bottom: 1rem;
+    }
+    .email-input {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid #ddd;
+        border-radius: 0.25rem;
+        font-size: 0.95rem;
+        margin-bottom: 0.5rem;
+    }
+    .email-tag {
+        display: inline-block;
+        background-color: #e3f2fd;
+        color: #1976d2;
+        padding: 0.25rem 0.75rem;
+        border-radius: 1rem;
+        margin: 0.25rem;
+        font-size: 0.875rem;
+    }
+    .email-tag-remove {
+        margin-left: 0.5rem;
+        cursor: pointer;
+        font-weight: bold;
+    }
+    .share-modal-buttons {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 1rem;
+    }
+    .share-modal-button {
+        padding: 0.5rem 1.5rem;
+        border: none;
+        border-radius: 0.25rem;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+    .share-modal-button-primary {
+        background-color: #1f77b4;
+        color: white;
+    }
+    .share-modal-button-primary:hover {
+        background-color: #1565a0;
+    }
+    .share-modal-button-secondary {
+        background-color: #e0e0e0;
+        color: #333;
+    }
+    .share-modal-button-secondary:hover {
+        background-color: #d0d0d0;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -175,49 +267,95 @@ with st.sidebar:
     if app_token:
         st.caption(f"App Token: `{app_token}`")
 
+# Initialize session state for share functionality
+if "share_modal_open" not in st.session_state:
+    st.session_state["share_modal_open"] = False
+if "shared_emails" not in st.session_state:
+    st.session_state["shared_emails"] = []
+if "new_email" not in st.session_state:
+    st.session_state["new_email"] = ""
+
 # Share button in top right corner
 st.markdown("""
-    <div class="share-button-container">
-        <button class="share-button" onclick="shareApp()">Share</button>
+    <style>
+    .share-button-wrapper {
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        z-index: 999;
+    }
+    </style>
+    <div class="share-button-wrapper">
     </div>
-    <script>
-    function shareApp() {
-        const url = window.location.href;
-        if (navigator.share) {
-            navigator.share({
-                title: 'Adjust Testing Console',
-                text: 'Check out this Adjust Testing Console',
-                url: url
-            }).catch(err => {
-                console.log('Error sharing:', err);
-                copyToClipboard(url);
-            });
-        } else {
-            copyToClipboard(url);
-        }
-    }
-    function copyToClipboard(text) {
-        navigator.clipboard.writeText(text).then(function() {
-            alert('Link copied to clipboard! Share this link with others.');
-        }, function(err) {
-            // Fallback for older browsers
-            const textArea = document.createElement('textarea');
-            textArea.value = text;
-            textArea.style.position = 'fixed';
-            textArea.style.opacity = '0';
-            document.body.appendChild(textArea);
-            textArea.select();
-            try {
-                document.execCommand('copy');
-                alert('Link copied to clipboard! Share this link with others.');
-            } catch (err) {
-                prompt('Copy this link:', text);
-            }
-            document.body.removeChild(textArea);
-        });
-    }
-    </script>
 """, unsafe_allow_html=True)
+
+# Create columns to position Share button in top right
+col_left, col_right = st.columns([0.95, 0.05])
+with col_right:
+    if st.button("Share", key="share_button_top", help="Share access with other users"):
+        st.session_state["share_modal_open"] = not st.session_state["share_modal_open"]
+        st.rerun()
+
+# Share modal using Streamlit components
+if st.session_state["share_modal_open"]:
+    st.markdown("---")
+    with st.container():
+        st.markdown("### 📧 Share Access")
+        st.markdown("Enter email addresses of users you want to share access with:")
+        
+        # Display current emails
+        if st.session_state["shared_emails"]:
+            st.markdown("**Added emails:**")
+            for idx, email in enumerate(st.session_state["shared_emails"]):
+                col1, col2 = st.columns([0.9, 0.1])
+                with col1:
+                    st.markdown(f"📧 {email}")
+                with col2:
+                    if st.button("×", key=f"remove_{idx}"):
+                        st.session_state["shared_emails"].remove(email)
+                        st.rerun()
+        
+        # Add new email
+        new_email = st.text_input(
+            "Email address",
+            value=st.session_state["new_email"],
+            key="email_input",
+            placeholder="user@example.com",
+            label_visibility="visible"
+        )
+        
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col1:
+            if st.button("➕ Add Email", type="primary", use_container_width=True):
+                if new_email and "@" in new_email and "." in new_email.split("@")[1]:
+                    if new_email not in st.session_state["shared_emails"]:
+                        st.session_state["shared_emails"].append(new_email)
+                        st.session_state["new_email"] = ""
+                        st.rerun()
+                    else:
+                        st.warning("This email is already added.")
+                else:
+                    st.warning("Please enter a valid email address.")
+        
+        with col2:
+            if st.button("📤 Send Invites", type="primary", use_container_width=True):
+                if st.session_state["shared_emails"]:
+                    # In production, you would send emails here
+                    # For now, show success message
+                    st.success(f"✅ Invites sent successfully to: {', '.join(st.session_state['shared_emails'])}")
+                    st.session_state["shared_emails"] = []
+                    st.session_state["share_modal_open"] = False
+                    st.session_state["new_email"] = ""
+                    st.rerun()
+                else:
+                    st.warning("Please add at least one email address.")
+        
+        with col3:
+            if st.button("❌ Cancel", use_container_width=True):
+                st.session_state["share_modal_open"] = False
+                st.session_state["new_email"] = ""
+                st.rerun()
+    st.markdown("---")
 
 # Main content - Header section
 st.markdown('<p class="main-header">Testing console</p>', unsafe_allow_html=True)
