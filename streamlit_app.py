@@ -299,7 +299,41 @@ st.markdown("""
         min-width: 280px;
         max-width: 320px;
     }
+    /* Hide script tags and any code that might be visible */
+    script {
+        display: none !important;
+    }
     </style>
+    <script>
+    function handleShareSubmit() {
+        const email = document.getElementById('shareEmailInput').value.trim();
+        if (email && email.includes('@') && email.includes('.')) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('share_email', email);
+            window.location.href = url.toString();
+        } else {
+            alert('Please enter a valid email address.');
+        }
+    }
+    
+    function closeSharePopover() {
+        const url = new URL(window.location.href);
+        url.searchParams.set('close_share', 'true');
+        window.location.href = url.toString();
+    }
+    
+    // Close on outside click
+    setTimeout(function() {
+        document.addEventListener('click', function(event) {
+            const popover = document.getElementById('sharePopover');
+            const shareButton = event.target.closest('button[data-testid*="share_button_top"]');
+            const shareForm = document.getElementById('shareForm');
+            if (popover && !popover.contains(event.target) && !shareButton && event.target !== shareForm) {
+                closeSharePopover();
+            }
+        });
+    }, 100);
+    </script>
 """, unsafe_allow_html=True)
 
 # Create columns to position Share button in top right
@@ -339,38 +373,6 @@ if st.session_state["share_modal_open"]:
                 </div>
             </form>
         </div>
-        <script>
-        function handleShareSubmit() {
-            const email = document.getElementById('shareEmailInput').value.trim();
-            if (email && email.includes('@') && email.includes('.')) {
-                // Navigate with email as query param
-                const url = new URL(window.location.href);
-                url.searchParams.set('share_email', email);
-                window.location.href = url.toString();
-            } else {
-                alert('Please enter a valid email address.');
-            }
-        }
-        
-        function closeSharePopover() {
-            // Navigate without share modal state
-            const url = new URL(window.location.href);
-            url.searchParams.set('close_share', 'true');
-            window.location.href = url.toString();
-        }
-        
-        // Close on outside click
-        setTimeout(function() {
-            document.addEventListener('click', function(event) {
-                const popover = document.getElementById('sharePopover');
-                const shareButton = event.target.closest('button[data-testid*="share_button_top"]');
-                const shareForm = document.getElementById('shareForm');
-                if (popover && !popover.contains(event.target) && !shareButton && event.target !== shareForm) {
-                    closeSharePopover();
-                }
-            });
-        }, 100);
-        </script>
     """, unsafe_allow_html=True)
 
 # Main content - Header section
