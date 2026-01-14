@@ -169,8 +169,18 @@ with st.sidebar:
         "Select App",
         options=app_names,
         index=selected_index,
-        help="Select an app to test"
+        help="Select an app to test",
+        key="app_selectbox"
     )
+    
+    # Check if app selection has changed
+    previous_app_name = st.session_state.get("selected_app_name", "")
+    if previous_app_name != selected_app_name:
+        # App changed - clear cached device info and advertising ID
+        if "last_device_info" in st.session_state:
+            del st.session_state["last_device_info"]
+        st.session_state["advertising_id"] = ""
+        st.session_state["last_fetch_success"] = False
     
     # Automatically set app token based on selected app name
     app_token = APP_NAME_TO_TOKEN.get(selected_app_name, "")
