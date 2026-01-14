@@ -154,27 +154,25 @@ with st.sidebar:
     
     # App selection dropdown
     app_names = list(APP_NAME_TO_TOKEN.keys())
-    current_selection = st.session_state.get("selected_app_name", "")
     
-    # Find index safely
-    try:
-        if current_selection and current_selection in app_names:
-            selected_index = app_names.index(current_selection)
-        else:
-            selected_index = 0
-    except (ValueError, IndexError):
-        selected_index = 0
+    # Initialize app_selectbox in session state if not present
+    if "app_selectbox" not in st.session_state:
+        st.session_state["app_selectbox"] = app_names[0] if app_names else ""
+        st.session_state["selected_app_name"] = app_names[0] if app_names else ""
     
+    # Get the previous app name before selectbox renders
+    previous_app_name = st.session_state.get("selected_app_name", "")
+    
+    # Create selectbox - use the key to track state directly
     selected_app_name = st.selectbox(
         "Select App",
         options=app_names,
-        index=selected_index,
+        index=app_names.index(st.session_state["app_selectbox"]) if st.session_state["app_selectbox"] in app_names else 0,
         help="Select an app to test",
         key="app_selectbox"
     )
     
-    # Check if app selection has changed
-    previous_app_name = st.session_state.get("selected_app_name", "")
+    # Check if app selection has changed by comparing with previous value
     if previous_app_name != selected_app_name:
         # App changed - clear cached device info and advertising ID
         if "last_device_info" in st.session_state:
@@ -182,9 +180,11 @@ with st.sidebar:
         st.session_state["advertising_id"] = ""
         st.session_state["last_fetch_success"] = False
     
+    # Update session state with current selection
+    st.session_state["selected_app_name"] = selected_app_name
+    
     # Automatically set app token based on selected app name
     app_token = APP_NAME_TO_TOKEN.get(selected_app_name, "")
-    st.session_state["selected_app_name"] = selected_app_name
     st.session_state["app_token"] = app_token
     
     # Show selected app token (read-only)
