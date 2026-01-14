@@ -5,8 +5,12 @@ from datetime import datetime, timedelta, timezone
 import time
 import pandas as pd
 
-# Hardcoded API Auth Token
-API_AUTH_TOKEN = "vREkxoDNUEyrAtkhgtRN"
+# Get API Auth Token from Streamlit secrets
+try:
+    API_AUTH_TOKEN = st.secrets["api"]["AUTH_TOKEN"]
+except (KeyError, AttributeError):
+    st.error("⚠️ API Auth Token not found in secrets. Please configure it in Streamlit Cloud settings.")
+    st.stop()
 
 # API URLs
 DEVICE_INSPECT_URL = "https://api.adjust.com/device_service/api/v2/inspect_device"
@@ -136,29 +140,13 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# App name to token mapping
-APP_NAME_TO_TOKEN = {
-    "Word Search": "df8zj1g2e4n4",
-    "Word Trip": "brmx7fdxeakg",
-    "Daily themed crossword": "5m1ixiozuxs0",
-    "Tilescapes": "d9j2i31ih5hc",
-    "Crossword Go": "lh3djeuvx8u8",
-    "Word Bingo": "axyjxakbq4u8",
-    "Cryptogram": "mmdpjw08385c",
-    "Word Tour": "10m9pfaqr7og",
-    "Word Connect Association": "r35fo7shcq20",
-    "Crossword Explorer": "kl9obuzolf5s",
-    "Wordsearch Explorer Amazon": "imv73i9w1kw0",
-    "DTC Amazon": "m5wkkketzbwg",
-    "Word Jam": "yi754iuv045c",
-    "Word Search Solitaire": "f31mdtfxsj5s",
-    "Word Jam Amazon": "lq4zr6bosmbk",
-    "Word Trip Amazon": "o7zbc1ugkcg0",
-    "Wordsearch-wordtrip": "peaqr4bgdb7k",
-    "2248 Tiles Game": "wh6mlumfs2rk",
-    "WordPal": "ftrpnn2xascg",
-    "Word Planet": "0695581rbqww"
-}
+# Get App name to token mapping from Streamlit secrets
+try:
+    # Read from secrets - convert TOML section to dictionary
+    APP_NAME_TO_TOKEN = dict(st.secrets["app_tokens"])
+except (KeyError, AttributeError):
+    st.error("⚠️ App tokens not found in secrets. Please configure app_tokens in Streamlit Cloud settings.")
+    st.stop()
 
 # Sidebar for app selection
 with st.sidebar:
